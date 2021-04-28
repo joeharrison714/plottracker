@@ -93,7 +93,8 @@ namespace PlotTracker.Core
                 var pi = new PhaseInfo()
                 {
                     Number = ParsePhaseNumber(phase),
-                    StartDate = ParseDate(date)
+                    StartDate = ParseDate(date),
+                    Duration = null
                 };
 
                 plotInfo.Phases.Add(pi);

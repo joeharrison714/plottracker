@@ -22,7 +22,11 @@ namespace PlotTracker.ConsoleApp
 
 
             PlotTrackerMonitorApp monitorApp = new PlotTrackerMonitorApp(ptc);
-            monitorApp.Run();
+            if (args.Length == 1 && args[0].ToLower().Trim() == "csv")
+                monitorApp.RunCsvExport();
+            else
+                monitorApp.RunMonitor();
+
 
             //LogParser.ParseFile(@"C:\code\plottracker\src\PlotTracker\MockPlot\stdout.txt");
         }

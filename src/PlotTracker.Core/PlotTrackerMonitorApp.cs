@@ -20,15 +20,19 @@ namespace PlotTracker.Core
         //string LogPath = @"C:\chia\logs";
         //string ParsedLogPath = @"C:\chia\logs\parsed";
 
-        private Dictionary<string, PlotInfo> _plotInfoCache = new Dictionary<string, PlotInfo>();
+        private readonly PlotInfoRepository _plotInfoRepository;
+
+        private bool _isRunning = true;
 
         public PlotTrackerMonitorApp(PlotTrackerConfig config)
         {
             _config = config;
+
+            _plotInfoRepository = new PlotInfoRepository(_config.ParsedLogPath);
         }
-        public void Run()
+        public void RunMonitor()
         {
-            while (true)
+            while (_isRunning)
             {
                 Console.Clear();
 
@@ -36,13 +40,180 @@ namespace PlotTracker.Core
 
                 WriteCurrentStatus(allPlotInfos);
 
-                List<PlotInfo> historicalData = LoadHistoricalData();
+                List<PlotInfo> historicalData = _plotInfoRepository.GetAll();
 
                 WriteHistorySummary(historicalData);
 
                 CheckShouldStart(allPlotInfos);
 
-                Thread.Sleep(60000);
+                PromptAndSleep();
+            }
+        }
+
+        public void RunCsvExport()
+        {
+            string csvFilename = Path.Combine(_config.ParsedLogPath, $"data-{DateTime.Now.ToString("yyyy-MM-dd-hh-mm-ss")}.csv");
+
+            List<PlotInfo> historicalData = _plotInfoRepository.GetAll();
+
+            using (StreamWriter sw = new StreamWriter(csvFilename))
+            {
+                sw.Write("Id");
+                sw.Write(",");
+
+                sw.Write("Plot Size");
+                sw.Write(",");
+
+                sw.Write("Buffer Size");
+                sw.Write(",");
+
+                sw.Write("Buckets");
+                sw.Write(",");
+
+                sw.Write("Threads");
+                sw.Write(",");
+
+                sw.Write("Stripe Size");
+                sw.Write(",");
+
+                sw.Write("Start Date");
+                sw.Write(",");
+
+                sw.Write("End Date");
+                sw.Write(",");
+
+                sw.Write("Phase 1 Duration");
+                sw.Write(",");
+
+                sw.Write("Phase 2 Duration");
+                sw.Write(",");
+
+                sw.Write("Phase 3 Duration");
+                sw.Write(",");
+
+                sw.Write("Phase 4 Duration");
+                sw.Write(",");
+
+                sw.Write("Copy Time");
+                sw.Write(",");
+
+                sw.Write("Total Time");
+                sw.WriteLine();
+
+
+                foreach (var plotInfo in historicalData.OrderBy(p => p.StartDate))
+                {
+                    sw.Write(plotInfo.Id);
+                    sw.Write(",");
+
+                    sw.Write(plotInfo.PlotSize);
+                    sw.Write(",");
+
+                    sw.Write(plotInfo.BufferSize);
+                    sw.Write(",");
+
+                    sw.Write(plotInfo.Buckets);
+                    sw.Write(",");
+
+                    sw.Write(plotInfo.Threads);
+                    sw.Write(",");
+
+                    sw.Write(plotInfo.StripeSize);
+                    sw.Write(",");
+
+                    sw.Write(plotInfo.StartDate);
+                    sw.Write(",");
+
+                    sw.Write(plotInfo.EndDate);
+                    sw.Write(",");
+
+                    sw.Write(GetCsvString(plotInfo.GetPhaseDuration(1)));
+                    sw.Write(",");
+
+                    sw.Write(GetCsvString(plotInfo.GetPhaseDuration(2)));
+                    sw.Write(",");
+
+                    sw.Write(GetCsvString(plotInfo.GetPhaseDuration(3)));
+                    sw.Write(",");
+
+                    sw.Write(GetCsvString(plotInfo.GetPhaseDuration(4)));
+                    sw.Write(",");
+
+                    sw.Write(GetCsvString(plotInfo.CopyTime));
+                    sw.Write(",");
+
+                    sw.Write(GetCsvString(plotInfo.TotalTime));
+                    sw.WriteLine("");
+                }
+
+                sw.Flush();
+                sw.Close();
+            }
+        }
+
+        private string GetCsvString(double? d)
+        {
+            if (!d.HasValue) return "";
+            return d.Value.ToString();
+        }
+
+        private void PromptAndSleep()
+        {
+            Console.WriteLine("Will autorefresh. Or press (r) to refresh now or (x) to exit");
+
+            bool _keepAsking = true;
+
+            DateTime beginWait = DateTime.Now;
+            while (_keepAsking && DateTime.Now.Subtract(beginWait).TotalSeconds < 60)
+            {
+                if (Console.KeyAvailable)
+                {
+                    switch (Console.ReadKey(true).KeyChar)
+                    {
+                        case 'x':
+                        case 'X':
+                            _isRunning = false;
+                            _keepAsking = false;
+                            break;
+                        //case 'm':
+                        //case 'M':
+                        //    Menu();
+                        //    break;
+                        case 'r':
+                        case 'R':
+                            _keepAsking = false;
+                            break;
+                        default:
+                            Console.WriteLine("Invalid!");
+                            break;
+                    }
+
+                }
+                Thread.Sleep(250);
+            }
+        }
+
+
+        private bool PromptAccept(string question)
+        {
+            while (true)
+            {
+                Console.Write("{0} ", question.Trim());
+                string n = Console.ReadLine();
+
+                n = n.Trim().ToLower();
+
+                switch (n)
+                {
+                    case "y":
+                    case "yes":
+                        return true;
+                    case "n":
+                    case "no":
+                        return false;
+                }
+
+                Console.WriteLine("Invalid!");
             }
         }
 
@@ -90,6 +261,7 @@ namespace PlotTracker.Core
                         Process process = new Process();
                         process.StartInfo = startInfo;
                         process.Start();
+                        Thread.Sleep(1000);
                     }
 
                     //if (anyInPhase1)
@@ -136,18 +308,10 @@ namespace PlotTracker.Core
 
                 foreach (var plot in plots)
                 {
-                    if (!plot.IsComplete) continue;
-                    string filename = Path.Combine(_config.ParsedLogPath, plot.Id + ".json");
-                    if (!File.Exists(filename))
+                    if (!plot.IsComplete || !_plotInfoRepository.Exists(plot.Id))
                     {
-                        Console.WriteLine($"Saving {filename}");
-                        string json = JsonConvert.SerializeObject(plot, Formatting.Indented);
-                        using (StreamWriter writer = new StreamWriter(filename))
-                        {
-                            writer.Write(json);
-                            writer.Flush();
-                            writer.Close();
-                        }
+                        //Console.WriteLine($"Saving {plot.Id}");
+                        _plotInfoRepository.Save(plot);
                     }
                 }
 
@@ -197,16 +361,16 @@ namespace PlotTracker.Core
 
                 TimeSpan avgTotal = new TimeSpan(0, 0, avgTotalSeconds);
 
-                var avgPhase1Seconds = (int)Math.Ceiling(plots.SelectMany(p => p.Phases.Where(q => q.Number == 1).Select(q => q.Duration)).Average());
+                var avgPhase1Seconds = (int)Math.Ceiling(plots.SelectMany(p => p.Phases.Where(q => q.Number == 1).Select(q => q.Duration.Value)).Average());
                 TimeSpan avgPhase1 = new TimeSpan(0, 0, avgPhase1Seconds);
 
-                var avgPhase2Seconds = (int)Math.Ceiling(plots.SelectMany(p => p.Phases.Where(q => q.Number == 2).Select(q => q.Duration)).Average());
+                var avgPhase2Seconds = (int)Math.Ceiling(plots.SelectMany(p => p.Phases.Where(q => q.Number == 2).Select(q => q.Duration.Value)).Average());
                 TimeSpan avgPhase2 = new TimeSpan(0, 0, avgPhase2Seconds);
 
-                var avgPhase3Seconds = (int)Math.Ceiling(plots.SelectMany(p => p.Phases.Where(q => q.Number == 3).Select(q => q.Duration)).Average());
+                var avgPhase3Seconds = (int)Math.Ceiling(plots.SelectMany(p => p.Phases.Where(q => q.Number == 3).Select(q => q.Duration.Value)).Average());
                 TimeSpan avgPhase3 = new TimeSpan(0, 0, avgPhase3Seconds);
 
-                var avgPhase4Seconds = (int)Math.Ceiling(plots.SelectMany(p => p.Phases.Where(q => q.Number == 4).Select(q => q.Duration)).Average());
+                var avgPhase4Seconds = (int)Math.Ceiling(plots.SelectMany(p => p.Phases.Where(q => q.Number == 4).Select(q => q.Duration.Value)).Average());
                 TimeSpan avgPhase4 = new TimeSpan(0, 0, avgPhase4Seconds);
 
                 table.AddRow(pbd.Key.ToShortDateString(), plots.Count(), FormatTimespan(avgPhase1), FormatTimespan(avgPhase2),
@@ -218,32 +382,7 @@ namespace PlotTracker.Core
             Console.WriteLine();
         }
 
-        private List<PlotInfo> LoadHistoricalData()
-        {
-            DirectoryInfo logsDir = new DirectoryInfo(_config.ParsedLogPath);
 
-            List<PlotInfo> historicalData = new List<PlotInfo>();
-
-            foreach (var plotFile in logsDir.GetFiles("*.json"))
-            {
-                string fn = Path.GetFileNameWithoutExtension(plotFile.Name);
-
-                PlotInfo plotInfo;
-                if (_plotInfoCache.ContainsKey(fn))
-                {
-                    plotInfo = _plotInfoCache[fn];
-                }
-                else
-                {
-                    var json = File.ReadAllText(plotFile.FullName);
-                    plotInfo = JsonConvert.DeserializeObject<PlotInfo>(json);
-                    _plotInfoCache.Add(fn, plotInfo);
-                }
-
-                historicalData.Add(plotInfo);
-            }
-            return historicalData;
-        }
 
         private void WriteCurrentStatus(List<PlotInfo> allPlotInfos)
         {

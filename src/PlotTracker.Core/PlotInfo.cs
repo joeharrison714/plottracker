@@ -20,6 +20,18 @@ namespace PlotTracker.Core
             Phases = new List<PhaseInfo>();
         }
 
+        public double? GetPhaseDuration(int number)
+        {
+            var pi = Phases.SingleOrDefault(p => p.Number == number);
+
+            if (pi != null && pi.Duration.HasValue)
+            {
+                return pi.Duration.Value;
+            }
+
+            return null;
+        }
+
         public CurrentPlotStatus GetCurrentPlotStatus()
         {
             if (this.IsComplete) return null;
@@ -94,7 +106,7 @@ namespace PlotTracker.Core
         public DateTime? EndDate { get; set; }
         public int Number { get; set; }
 
-        public double Duration{ get; set; }
+        public double? Duration{ get; set; }
         public string CPU{ get; set; }
     }
 }
