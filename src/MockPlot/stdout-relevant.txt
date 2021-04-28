@@ -1,0 +1,32 @@
+
+Starting plotting progress into temporary dirs: d:\chia\temp and d:\chia\temp
+ID: 940b24d752730581fd9cfc61eff1c34b87732cec1ec232b8aa9afeee685a64c3
+Plot size is: 32
+Buffer size is: 4000MiB
+Using 128 buckets
+Using 4 threads of stripe size 65536
+
+Starting phase 1/4: Forward Propagation into tmp files... Fri Apr 23 20:45:41 2021
+
+Time for phase 1 = 8120.995 seconds. CPU (171.300%) Fri Apr 23 23:01:02 2021
+
+Starting phase 2/4: Backpropagation into tmp files... Fri Apr 23 23:01:02 2021
+
+Time for phase 2 = 4117.425 seconds. CPU (87.140%) Sat Apr 24 00:09:39 2021
+Wrote: 268
+
+Starting phase 3/4: Compression from tmp files into "d:\\chia\\temp\\plot-k32-2021-04-23-20-45-940b24d752730581fd9cfc61eff1c34b87732cec1ec232b8aa9afeee685a64c3.plot.2.tmp" ... Sat Apr 24 00:09:39 2021
+
+Total compress table time: 2356.243 seconds. CPU (66.290%) Sat Apr 24 04:06:42 2021
+Time for phase 3 = 14223.389 seconds. CPU (69.160%) Sat Apr 24 04:06:43 2021
+
+Starting phase 4/4: Write Checkpoint tables into "d:\\chia\\temp\\plot-k32-2021-04-23-20-45-940b24d752730581fd9cfc61eff1c34b87732cec1ec232b8aa9afeee685a64c3.plot.2.tmp" ... Sat Apr 24 04:06:43 2021
+
+Time for phase 4 = 1480.091 seconds. CPU (59.690%) Sat Apr 24 04:31:23 2021
+Approximate working space used (without final file): 269.444 GiB
+Final File size: 101.409 GiB
+Total time = 27941.905 seconds. CPU (100.990%) Sat Apr 24 04:31:23 2021
+Copied final file from "d:\\chia\\temp\\plot-k32-2021-04-23-20-45-940b24d752730581fd9cfc61eff1c34b87732cec1ec232b8aa9afeee685a64c3.plot.2.tmp" to "f:\\chia\\farm\\plot-k32-2021-04-23-20-45-940b24d752730581fd9cfc61eff1c34b87732cec1ec232b8aa9afeee685a64c3.plot.2.tmp"
+Copy time = 597.893 seconds. CPU (14.080%) Sat Apr 24 04:41:21 2021
+Removed temp2 file "d:\\chia\\temp\\plot-k32-2021-04-23-20-45-940b24d752730581fd9cfc61eff1c34b87732cec1ec232b8aa9afeee685a64c3.plot.2.tmp"? 1
+Renamed final file from "f:\\chia\\farm\\plot-k32-2021-04-23-20-45-940b24d752730581fd9cfc61eff1c34b87732cec1ec232b8aa9afeee685a64c3.plot.2.tmp" to "f:\\chia\\farm\\plot-k32-2021-04-23-20-45-940b24d752730581fd9cfc61eff1c34b87732cec1ec232b8aa9afeee685a64c3.plot"
