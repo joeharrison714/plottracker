@@ -9,19 +9,19 @@ namespace PlotTracker.ConsoleApp
     {
         static void Main(string[] args)
         {
-            //var builder = new ConfigurationBuilder()
-            //    .AddJsonFile($"appsettings.json", true, true);
+            var builder = new ConfigurationBuilder()
+                .AddJsonFile($"appsettings.json", true, true);
 
-            //var config = builder.Build();
+            var config = builder.Build();
 
-            //var ptc = new PlotTrackerConfig();
-            //config.GetSection("plottracker").Bind(ptc);
+            var ptc = new PlotTrackerConfig();
+            config.GetSection("plottracker").Bind(ptc);
 
             //PlotTrackerApp app = new PlotTrackerApp(ptc);
             //app.Run();
 
 
-            PlotTrackerMonitorApp monitorApp = new PlotTrackerMonitorApp();
+            PlotTrackerMonitorApp monitorApp = new PlotTrackerMonitorApp(ptc);
             monitorApp.Run();
 
             //LogParser.ParseFile(@"C:\code\plottracker\src\PlotTracker\MockPlot\stdout.txt");

@@ -1,7 +1,9 @@
 ﻿using BetterConsoleTables;
 using Newtonsoft.Json;
+using PlotTracker.Core.Configuration;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -14,12 +16,16 @@ namespace PlotTracker.Core
     {
         const int HistoryDays = 7;
         const int DeleteLogsAfterDays = 2;
-
-        string LogPath = @"C:\chia\logs";
-        string ParsedLogPath = @"C:\chia\logs\parsed";
+        private readonly PlotTrackerConfig _config;
+        //string LogPath = @"C:\chia\logs";
+        //string ParsedLogPath = @"C:\chia\logs\parsed";
 
         private Dictionary<string, PlotInfo> _plotInfoCache = new Dictionary<string, PlotInfo>();
 
+        public PlotTrackerMonitorApp(PlotTrackerConfig config)
+        {
+            _config = config;
+        }
         public void Run()
         {
             while (true)
@@ -30,19 +36,86 @@ namespace PlotTracker.Core
 
                 WriteCurrentStatus(allPlotInfos);
 
-                List<PlotInfo> historicalData = LoadHistoricalData(ParsedLogPath);
+                List<PlotInfo> historicalData = LoadHistoricalData();
 
                 WriteHistorySummary(historicalData);
+
+                CheckShouldStart(allPlotInfos);
 
                 Thread.Sleep(60000);
             }
         }
 
+        private void CheckShouldStart(List<PlotInfo> allPlotInfos)
+        {
+            var runningPlots = allPlotInfos.Where(p => !p.IsComplete).ToList();
+
+            foreach (var tempDirConfig in _config.TempDirs)
+            {
+                if (tempDirConfig.ConcurrentPlots == 0) continue;
+
+                var thesePlots = runningPlots.Where(p => PathEquals(p.TempPath, tempDirConfig.Path)).ToList();
+
+                if (thesePlots.Count < tempDirConfig.ConcurrentPlots)
+                {
+                    bool shouldStart = false;
+
+                    if (thesePlots.Count == 0)
+                        shouldStart = true;
+                    else
+                    {
+                        var mostRecent = thesePlots.Where(p=>p.StartDate.HasValue).OrderByDescending(p => p.StartDate).First();
+
+                        var mostRecentTs = DateTime.Now - mostRecent.StartDate.Value;
+
+                        if (mostRecentTs.TotalSeconds > tempDirConfig.StaggerDelaySeconds)
+                        {
+                            shouldStart = true;
+                        }
+                        else
+                        {
+                            var when = new TimeSpan(0, 0, tempDirConfig.StaggerDelaySeconds - (int)Math.Round(mostRecentTs.TotalSeconds));
+                            Console.WriteLine($"Will start new plot in {FormatTimespan(when)}");
+                        }
+                    }
+
+                    if (shouldStart)
+                    {
+                        ProcessStartInfo startInfo = new ProcessStartInfo();
+                        startInfo.FileName = tempDirConfig.StartCommand;
+                        startInfo.Arguments = tempDirConfig.StartArgs;
+                        startInfo.UseShellExecute = false;
+                        startInfo.EnvironmentVariables.Add("TempPath", tempDirConfig.Path);
+                        startInfo.EnvironmentVariables.Add("LogPath", _config.LogPath);
+                        Process process = new Process();
+                        process.StartInfo = startInfo;
+                        process.Start();
+                    }
+
+                    //if (anyInPhase1)
+                    //{
+                    //    Console.WriteLine("Waiting to start next plot");
+                    //}
+                    //else
+                    //{
+                    //    Console.WriteLine($"Starting plot creation in temp folder: {tempDirConfig.Path}");
+                    //    StartPlot(tempDirConfig);
+                    //}
+                }
+            }
+        }
+
+        internal bool PathEquals(string path1, string path2)
+        {
+            return Path.GetFullPath(path1)
+                .Equals(Path.GetFullPath(path2), StringComparison.InvariantCultureIgnoreCase);
+        }
+
         private List<PlotInfo> LoadAndParseLogs()
         {
-            Directory.CreateDirectory(ParsedLogPath);
+            Directory.CreateDirectory(_config.ParsedLogPath);
 
-            DirectoryInfo logsDir = new DirectoryInfo(LogPath);
+            DirectoryInfo logsDir = new DirectoryInfo(_config.LogPath);
 
             List<PlotInfo> allPlotInfos = new List<PlotInfo>();
 
@@ -64,7 +137,7 @@ namespace PlotTracker.Core
                 foreach (var plot in plots)
                 {
                     if (!plot.IsComplete) continue;
-                    string filename = Path.Combine(ParsedLogPath, plot.Id + ".json");
+                    string filename = Path.Combine(_config.ParsedLogPath, plot.Id + ".json");
                     if (!File.Exists(filename))
                     {
                         Console.WriteLine($"Saving {filename}");
@@ -145,9 +218,9 @@ namespace PlotTracker.Core
             Console.WriteLine();
         }
 
-        private List<PlotInfo> LoadHistoricalData(string parsedLogPath)
+        private List<PlotInfo> LoadHistoricalData()
         {
-            DirectoryInfo logsDir = new DirectoryInfo(parsedLogPath);
+            DirectoryInfo logsDir = new DirectoryInfo(_config.ParsedLogPath);
 
             List<PlotInfo> historicalData = new List<PlotInfo>();
 

@@ -138,13 +138,13 @@ namespace PlotTracker.Core
                 TempDir = tempDirConfig.Path
             };
 
-            runningPlot.Temp2Path = tempDirConfig.Temp2Path;
-            runningPlot.FinalPath = tempDirConfig.FinalPath;
+            //runningPlot.Temp2Path = tempDirConfig.Temp2Path;
+            //runningPlot.FinalPath = tempDirConfig.FinalPath;
             runningPlot.LogPath = _config.LogPath;
-            runningPlot.PlotSize = tempDirConfig.PlotSize ??_config.DefaultPlotSize ?? null;
-            runningPlot.Buffer = tempDirConfig.Buffer ??_config.DefaultBuffer ?? null;
-            runningPlot.NumThreads = tempDirConfig.NumThreads ?? _config.DefaultNumThreads ?? null;
-            runningPlot.Buckets = tempDirConfig.Buckets ?? _config.DefaultBuckets ?? null;
+            //runningPlot.PlotSize = tempDirConfig.PlotSize ??_config.DefaultPlotSize ?? null;
+            //runningPlot.Buffer = tempDirConfig.Buffer ??_config.DefaultBuffer ?? null;
+            //runningPlot.NumThreads = tempDirConfig.NumThreads ?? _config.DefaultNumThreads ?? null;
+            //runningPlot.Buckets = tempDirConfig.Buckets ?? _config.DefaultBuckets ?? null;
 
             
 
