@@ -308,7 +308,7 @@ namespace PlotTracker.Core
 
                 foreach (var plot in plots)
                 {
-                    if (!plot.IsComplete || !_plotInfoRepository.Exists(plot.Id))
+                    if (plot.IsComplete && !_plotInfoRepository.Exists(plot.Id))
                     {
                         //Console.WriteLine($"Saving {plot.Id}");
                         _plotInfoRepository.Save(plot);
