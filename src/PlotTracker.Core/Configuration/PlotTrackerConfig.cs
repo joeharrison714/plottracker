@@ -11,6 +11,7 @@ namespace PlotTracker.Core.Configuration
         public List<TempDirConfig> TempDirs{ get; set; }
         public string LogPath{ get; set; }
         public string ParsedLogPath { get; set; }
+        public bool StaggerDelayIsGlobal{ get; set; }
     }
 
     public class TempDirConfig

@@ -44,7 +44,11 @@ namespace PlotTracker.Core
 
                 WriteHistorySummary(historicalData);
 
-                CheckShouldStart(allPlotInfos);
+                bool tookAction = CheckShouldStart(allPlotInfos);
+                if (tookAction)
+                {
+                    continue; // a plot was started, so re-evaluate before sleeping
+                }
 
                 PromptAndSleep();
             }
@@ -56,106 +60,12 @@ namespace PlotTracker.Core
 
             List<PlotInfo> historicalData = _plotInfoRepository.GetAll();
 
-            using (StreamWriter sw = new StreamWriter(csvFilename))
-            {
-                sw.Write("Id");
-                sw.Write(",");
+            Exporter e = new Exporter();
 
-                sw.Write("Plot Size");
-                sw.Write(",");
-
-                sw.Write("Buffer Size");
-                sw.Write(",");
-
-                sw.Write("Buckets");
-                sw.Write(",");
-
-                sw.Write("Threads");
-                sw.Write(",");
-
-                sw.Write("Stripe Size");
-                sw.Write(",");
-
-                sw.Write("Start Date");
-                sw.Write(",");
-
-                sw.Write("End Date");
-                sw.Write(",");
-
-                sw.Write("Phase 1 Duration");
-                sw.Write(",");
-
-                sw.Write("Phase 2 Duration");
-                sw.Write(",");
-
-                sw.Write("Phase 3 Duration");
-                sw.Write(",");
-
-                sw.Write("Phase 4 Duration");
-                sw.Write(",");
-
-                sw.Write("Copy Time");
-                sw.Write(",");
-
-                sw.Write("Total Time");
-                sw.WriteLine();
-
-
-                foreach (var plotInfo in historicalData.OrderBy(p => p.StartDate))
-                {
-                    sw.Write(plotInfo.Id);
-                    sw.Write(",");
-
-                    sw.Write(plotInfo.PlotSize);
-                    sw.Write(",");
-
-                    sw.Write(plotInfo.BufferSize);
-                    sw.Write(",");
-
-                    sw.Write(plotInfo.Buckets);
-                    sw.Write(",");
-
-                    sw.Write(plotInfo.Threads);
-                    sw.Write(",");
-
-                    sw.Write(plotInfo.StripeSize);
-                    sw.Write(",");
-
-                    sw.Write(plotInfo.StartDate);
-                    sw.Write(",");
-
-                    sw.Write(plotInfo.EndDate);
-                    sw.Write(",");
-
-                    sw.Write(GetCsvString(plotInfo.GetPhaseDuration(1)));
-                    sw.Write(",");
-
-                    sw.Write(GetCsvString(plotInfo.GetPhaseDuration(2)));
-                    sw.Write(",");
-
-                    sw.Write(GetCsvString(plotInfo.GetPhaseDuration(3)));
-                    sw.Write(",");
-
-                    sw.Write(GetCsvString(plotInfo.GetPhaseDuration(4)));
-                    sw.Write(",");
-
-                    sw.Write(GetCsvString(plotInfo.CopyTime));
-                    sw.Write(",");
-
-                    sw.Write(GetCsvString(plotInfo.TotalTime));
-                    sw.WriteLine("");
-                }
-
-                sw.Flush();
-                sw.Close();
-            }
+            e.ExportCsv(historicalData, csvFilename);
         }
 
-        private string GetCsvString(double? d)
-        {
-            if (!d.HasValue) return "";
-            return d.Value.ToString();
-        }
+
 
         private void PromptAndSleep()
         {
@@ -194,49 +104,40 @@ namespace PlotTracker.Core
         }
 
 
-        private bool PromptAccept(string question)
-        {
-            while (true)
-            {
-                Console.Write("{0} ", question.Trim());
-                string n = Console.ReadLine();
-
-                n = n.Trim().ToLower();
-
-                switch (n)
-                {
-                    case "y":
-                    case "yes":
-                        return true;
-                    case "n":
-                    case "no":
-                        return false;
-                }
-
-                Console.WriteLine("Invalid!");
-            }
-        }
-
-        private void CheckShouldStart(List<PlotInfo> allPlotInfos)
+        private bool CheckShouldStart(List<PlotInfo> allPlotInfos)
         {
             var runningPlots = allPlotInfos.Where(p => !p.IsComplete).ToList();
 
-            foreach (var tempDirConfig in _config.TempDirs)
+            bool tookAction = false;
+
+            foreach (var tempDirConfig in _config.TempDirs.OrderBy(p=> runningPlots.Count(q=> PathEquals(q.TempPath, p.Path))))
             {
                 if (tempDirConfig.ConcurrentPlots == 0) continue;
 
                 var thesePlots = runningPlots.Where(p => PathEquals(p.TempPath, tempDirConfig.Path)).ToList();
+                Console.WriteLine($"{tempDirConfig.Path} has {thesePlots.Count} running plots");
 
                 if (thesePlots.Count < tempDirConfig.ConcurrentPlots)
                 {
                     bool shouldStart = false;
 
-                    if (thesePlots.Count == 0)
-                        shouldStart = true;
+                    PlotInfo mostRecent = null;
+
+                    if (_config.StaggerDelayIsGlobal)
+                    {
+                        mostRecent = runningPlots.Where(p => p.StartDate.HasValue).OrderByDescending(p => p.StartDate).FirstOrDefault();
+                    }
                     else
                     {
-                        var mostRecent = thesePlots.Where(p=>p.StartDate.HasValue).OrderByDescending(p => p.StartDate).First();
+                        mostRecent = thesePlots.Where(p => p.StartDate.HasValue).OrderByDescending(p => p.StartDate).FirstOrDefault();
+                    }
 
+                    if (mostRecent == null)
+                    {
+                        shouldStart = true;
+                    }
+                    else
+                    {
                         var mostRecentTs = DateTime.Now - mostRecent.StartDate.Value;
 
                         if (mostRecentTs.TotalSeconds > tempDirConfig.StaggerDelaySeconds)
@@ -250,6 +151,8 @@ namespace PlotTracker.Core
                         }
                     }
 
+
+
                     if (shouldStart)
                     {
                         ProcessStartInfo startInfo = new ProcessStartInfo();
@@ -261,7 +164,8 @@ namespace PlotTracker.Core
                         Process process = new Process();
                         process.StartInfo = startInfo;
                         process.Start();
-                        Thread.Sleep(1000);
+                        tookAction = true;
+                        Thread.Sleep(10000);
                     }
 
                     //if (anyInPhase1)
@@ -273,8 +177,13 @@ namespace PlotTracker.Core
                     //    Console.WriteLine($"Starting plot creation in temp folder: {tempDirConfig.Path}");
                     //    StartPlot(tempDirConfig);
                     //}
+
+                    if (tookAction) break; // exit loop so currently running plots will be re-evaluated
                 }
+                else
+                    Console.WriteLine("Concurrent plots met");
             }
+            return tookAction;
         }
 
         internal bool PathEquals(string path1, string path2)
@@ -351,14 +260,13 @@ namespace PlotTracker.Core
                 plotsByDay[justDay].Add(plot);
             }
 
-            Table table = new Table("Date", "Plots", "Avg Phase 1", "Avg Phase 2", "Avg Phase 3", "Avg Phase 4", "Avg. Total");
+            Table table = new Table("Date", "Plots", "Avg Phase 1", "Avg Phase 2", "Avg Phase 3", "Avg Phase 4", "Avg. Copy", "Avg. Total");
 
             foreach (var pbd in plotsByDay.OrderByDescending(p => p.Key).Take(HistoryDays))
             {
                 var plots = pbd.Value;
 
                 var avgTotalSeconds = (int)Math.Ceiling(plots.Where(p => p.TotalTime.HasValue).Average(p => p.TotalTime.Value));
-
                 TimeSpan avgTotal = new TimeSpan(0, 0, avgTotalSeconds);
 
                 var avgPhase1Seconds = (int)Math.Ceiling(plots.SelectMany(p => p.Phases.Where(q => q.Number == 1).Select(q => q.Duration.Value)).Average());
@@ -373,8 +281,11 @@ namespace PlotTracker.Core
                 var avgPhase4Seconds = (int)Math.Ceiling(plots.SelectMany(p => p.Phases.Where(q => q.Number == 4).Select(q => q.Duration.Value)).Average());
                 TimeSpan avgPhase4 = new TimeSpan(0, 0, avgPhase4Seconds);
 
+                var avgCopySeconds = (int)Math.Ceiling(plots.Where(p => p.CopyTime.HasValue).Average(p => p.CopyTime.Value));
+                TimeSpan avgCopy = new TimeSpan(0, 0, avgCopySeconds);
+
                 table.AddRow(pbd.Key.ToShortDateString(), plots.Count(), FormatTimespan(avgPhase1), FormatTimespan(avgPhase2),
-                    FormatTimespan(avgPhase3), FormatTimespan(avgPhase4), FormatTimespan(avgTotal));
+                    FormatTimespan(avgPhase3), FormatTimespan(avgPhase4), FormatTimespan(avgCopy), FormatTimespan(avgTotal));
             }
 
             if (table.Rows.Count() > 0)
