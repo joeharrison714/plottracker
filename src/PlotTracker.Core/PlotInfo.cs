@@ -11,6 +11,8 @@ namespace PlotTracker.Core
         public string CurrentPhase { get; set; }
         public DateTime? StartTime { get; set; }
         public int? PhaseNumber{ get; set; }
+
+        public double PercentComplete{ get; set; }
     }
 
     public class PlotInfo
@@ -55,6 +57,13 @@ namespace PlotTracker.Core
                 cps.CurrentPhase = "Copying";
                 cps.StartTime = currentPhase.EndDate;
                 cps.PhaseNumber = null;
+            }
+
+            if (Phases.Any())
+            {
+
+                int totalPhaseLines = Phases.Sum(p => p.LogLineCount);
+                cps.PercentComplete = (totalPhaseLines + 0.0) / (788.0 + 30 + 1636 + 143);
             }
 
             return cps;
@@ -108,5 +117,7 @@ namespace PlotTracker.Core
 
         public double? Duration{ get; set; }
         public string CPU{ get; set; }
+
+        public int LogLineCount{ get; set; }
     }
 }

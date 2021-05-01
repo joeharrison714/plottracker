@@ -290,14 +290,13 @@ namespace PlotTracker.Core
 
             if (table.Rows.Count() > 0)
                 Console.WriteLine(table.ToString());
-            Console.WriteLine();
         }
 
 
 
         private void WriteCurrentStatus(List<PlotInfo> allPlotInfos)
         {
-            Table table = new Table("ID", "Start Time", "Temp Drive", "Current Phase", "Phase Start", "Time In Phase", "Total Time");
+            Table table = new Table("ID", "Start Time", "Temp Drive", "Current Phase", "Phase Start", "Time In Phase", "%", "Total Time");
 
             foreach (var plotInfo in allPlotInfos.Where(p => !p.IsComplete).OrderBy(p => p.StartDate))
             {
@@ -313,6 +312,7 @@ namespace PlotTracker.Core
                 string currentStatus = "";
                 string phaseStart = "";
                 string timeInPhase = "";
+                string pct = "";
 
                 var cps = plotInfo.GetCurrentPlotStatus();
                 if (cps != null)
@@ -325,6 +325,7 @@ namespace PlotTracker.Core
                         phaseStart = cps.StartTime.ToString();
                         timeInPhase = FormatTimespan(DateTime.Now - cps.StartTime.Value);
                     }
+                    pct = cps.PercentComplete.ToString("P0");
                 }
 
                 if (plotInfo.IsComplete)
@@ -334,13 +335,12 @@ namespace PlotTracker.Core
 
                 string tempDrive = Directory.GetDirectoryRoot(plotInfo.TempPath);
 
-                table.AddRow(plotInfo.ShortId, startTime, tempDrive, currentStatus, phaseStart, timeInPhase, totalTime);
+                table.AddRow(plotInfo.ShortId, startTime, tempDrive, currentStatus, phaseStart, timeInPhase, pct, totalTime);
 
 
             }
             if (table.Rows.Count() > 0)
                 Console.WriteLine(table.ToString());
-            Console.WriteLine();
         }
 
         private string FormatTimespan(TimeSpan timeSpan)

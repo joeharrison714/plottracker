@@ -211,7 +211,7 @@ namespace PlotTracker.Core
                 PlotInfo plotInfo;
                 _plotInfos.TryGetValue(runningPlot.InternalId, out plotInfo);
                 
-                LogParser.ParseLine(e.Data, ref plotInfo);
+                //LogParser.ParseLine(e.Data, ref plotInfo);
 
                 _plotInfos.AddOrUpdate(runningPlot.InternalId, plotInfo, (key, existingVal) =>
                 {
