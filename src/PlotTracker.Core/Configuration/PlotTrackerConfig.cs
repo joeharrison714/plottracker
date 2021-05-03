@@ -12,6 +12,14 @@ namespace PlotTracker.Core.Configuration
         public string LogPath{ get; set; }
         public string ParsedLogPath { get; set; }
         public bool StaggerDelayIsGlobal{ get; set; }
+
+        public List<FinalDirConfig> FinalDirs { get; set; }
+        public bool FinalDirMostFirst { get; set; }
+    }
+
+    public class FinalDirConfig
+    {
+        public string Path { get; set; }
     }
 
     public class TempDirConfig

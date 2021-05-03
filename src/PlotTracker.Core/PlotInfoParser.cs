@@ -166,7 +166,8 @@ namespace PlotTracker.Core
         private static DateTime ParseDate(string str)
         {
             //Fri Apr 23 20:45:41 2021
-            var parts = str.Split(" ");
+            //Sat May  1 02:18:09 2021
+            var parts = str.Split(" ", StringSplitOptions.RemoveEmptyEntries);
             return DateTime.Parse($"{parts[1]} {parts[2]} {parts[4]} {parts[3]}");
         }
 

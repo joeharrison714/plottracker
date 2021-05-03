@@ -110,14 +110,16 @@ namespace PlotTracker.Core
 
             bool tookAction = false;
 
-            foreach (var tempDirConfig in _config.TempDirs.OrderBy(p=> runningPlots.Count(q=> PathEquals(q.TempPath, p.Path))))
-            {
-                if (tempDirConfig.ConcurrentPlots == 0) continue;
+            string finalPath = GetFinalDir();
+            Console.WriteLine($"Next final dir to be used: {finalPath}");
 
-                var thesePlots = runningPlots.Where(p => PathEquals(p.TempPath, tempDirConfig.Path)).ToList();
-                Console.WriteLine($"{tempDirConfig.Path} has {thesePlots.Count} running plots");
+            var tempDirs = GetRunningPlotsByTempDir(runningPlots);
 
-                if (thesePlots.Count < tempDirConfig.ConcurrentPlots)
+            foreach (var tempDir in tempDirs.OrderBy(p=>p.RunningPlotCount).ThenBy(p=>p.MostRecentPlotStartDate))
+            {                
+                Console.WriteLine($"{tempDir.TempPath} has {tempDir.RunningPlotCount} running plots (Most recent started at {tempDir.MostRecentPlotStartDate})");
+
+                if (tempDir.RunningPlotCount < tempDir.TempDirConfig.ConcurrentPlots)
                 {
                     bool shouldStart = false;
 
@@ -129,7 +131,7 @@ namespace PlotTracker.Core
                     }
                     else
                     {
-                        mostRecent = thesePlots.Where(p => p.StartDate.HasValue).OrderByDescending(p => p.StartDate).FirstOrDefault();
+                        mostRecent = tempDir.RunningPlots.Where(p => p.StartDate.HasValue).OrderByDescending(p => p.StartDate).FirstOrDefault();
                     }
 
                     if (mostRecent == null)
@@ -140,32 +142,44 @@ namespace PlotTracker.Core
                     {
                         var mostRecentTs = DateTime.Now - mostRecent.StartDate.Value;
 
-                        if (mostRecentTs.TotalSeconds > tempDirConfig.StaggerDelaySeconds)
+                        if (mostRecentTs.TotalSeconds > tempDir.TempDirConfig.StaggerDelaySeconds)
                         {
                             shouldStart = true;
                         }
                         else
                         {
-                            var when = new TimeSpan(0, 0, tempDirConfig.StaggerDelaySeconds - (int)Math.Round(mostRecentTs.TotalSeconds));
+                            var when = new TimeSpan(0, 0, tempDir.TempDirConfig.StaggerDelaySeconds - (int)Math.Round(mostRecentTs.TotalSeconds));
                             Console.WriteLine($"Will start new plot in {FormatTimespan(when)}");
                         }
                     }
+
+                    
 
 
 
                     if (shouldStart)
                     {
-                        ProcessStartInfo startInfo = new ProcessStartInfo();
-                        startInfo.FileName = tempDirConfig.StartCommand;
-                        startInfo.Arguments = tempDirConfig.StartArgs;
-                        startInfo.UseShellExecute = false;
-                        startInfo.EnvironmentVariables.Add("TempPath", tempDirConfig.Path);
-                        startInfo.EnvironmentVariables.Add("LogPath", _config.LogPath);
-                        Process process = new Process();
-                        process.StartInfo = startInfo;
-                        process.Start();
-                        tookAction = true;
-                        Thread.Sleep(10000);
+                        if (finalPath == null)
+                        {
+                            Console.WriteLine("No available final dirs with enough space!");
+                        }
+                        else
+                        {
+                            Console.WriteLine("Using final path: " + finalPath);
+
+                            ProcessStartInfo startInfo = new ProcessStartInfo();
+                            startInfo.FileName = tempDir.TempDirConfig.StartCommand;
+                            startInfo.Arguments = tempDir.TempDirConfig.StartArgs;
+                            startInfo.UseShellExecute = false;
+                            startInfo.EnvironmentVariables.Add("TempPath", tempDir.TempDirConfig.Path);
+                            startInfo.EnvironmentVariables.Add("LogPath", _config.LogPath);
+                            startInfo.EnvironmentVariables.Add("FinalPath", finalPath);
+                            Process process = new Process();
+                            process.StartInfo = startInfo;
+                            process.Start();
+                            tookAction = true;
+                            Thread.Sleep(10000);
+                        }
                     }
 
                     //if (anyInPhase1)
@@ -184,6 +198,59 @@ namespace PlotTracker.Core
                     Console.WriteLine("Concurrent plots met");
             }
             return tookAction;
+        }
+
+        private List<TempDirRunningPlot> GetRunningPlotsByTempDir(List<PlotInfo> runningPlots)
+        {
+            List<TempDirRunningPlot> tempDirRunningPlots = new List<TempDirRunningPlot>();
+
+            foreach (var tempDirConfig in _config.TempDirs)
+            {
+                if (tempDirConfig.ConcurrentPlots == 0) continue;
+
+                TempDirRunningPlot tempDir = new TempDirRunningPlot();
+                tempDir.TempDirConfig = tempDirConfig;
+                tempDir.TempPath = tempDirConfig.Path;
+
+                tempDir.RunningPlots = runningPlots.Where(p => PathEquals(p.TempPath, tempDirConfig.Path)).ToList();
+
+                tempDir.RunningPlotCount = tempDir.RunningPlots.Count;
+
+                if (tempDir.RunningPlotCount > 0)
+                {
+                    var f = tempDir.RunningPlots.OrderByDescending(p => p.StartDate).FirstOrDefault();
+                    if (f != null)
+                    {
+                        tempDir.MostRecentPlotStartDate = f.StartDate;
+                    }
+                }
+
+                tempDirRunningPlots.Add(tempDir);
+            }
+
+            return tempDirRunningPlots;
+        }
+
+        const long NeededSpace = 108905839000;
+        private string GetFinalDir()
+        {
+            Dictionary<string, long> useablePaths = new Dictionary<string, long>();
+
+            foreach (var fd in _config.FinalDirs)
+            {
+                DriveInfo di = new DriveInfo(Path.GetPathRoot(fd.Path));
+                //Console.WriteLine($"{di.RootDirectory} - {di.AvailableFreeSpace}");
+                if (di.AvailableFreeSpace > NeededSpace)
+                {
+                    useablePaths.Add(fd.Path, di.AvailableFreeSpace);
+                }
+            }
+
+            if (!useablePaths.Any()) return null;
+
+            if (_config.FinalDirMostFirst)
+                return useablePaths.OrderByDescending(p => p.Value).First().Key;
+            return useablePaths.OrderBy(p => p.Value).First().Key;
         }
 
         internal bool PathEquals(string path1, string path2)
