@@ -15,6 +15,8 @@ namespace PlotTracker.Core.Configuration
 
         public List<FinalDirConfig> FinalDirs { get; set; }
         public bool FinalDirMostFirst { get; set; }
+
+        public List<MaintenanceWindowConfigEntry> MaintenanceWindows{ get; set; }
     }
 
     public class FinalDirConfig
@@ -29,5 +31,12 @@ namespace PlotTracker.Core.Configuration
         public int StaggerDelaySeconds { get; set; }
         public string StartCommand{ get; set; }
         public string StartArgs{ get; set; }
+    }
+
+    public class MaintenanceWindowConfigEntry
+    {
+        public DayOfWeek Weekday{ get; set; }
+        public string StartTime{ get; set; }
+        public string Duration { get; set; }
     }
 }

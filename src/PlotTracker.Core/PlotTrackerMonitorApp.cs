@@ -44,13 +44,43 @@ namespace PlotTracker.Core
 
                 WriteHistorySummary(historicalData);
 
+                CheckMaintenanceWindow();
+
                 bool tookAction = CheckShouldStart(allPlotInfos);
                 if (tookAction)
                 {
                     continue; // a plot was started, so re-evaluate before sleeping
                 }
 
+
                 PromptAndSleep();
+            }
+        }
+
+        private void CheckMaintenanceWindow()
+        {
+            if (_config.MaintenanceWindows == null) return;
+
+            foreach (var mw in _config.MaintenanceWindows)
+            {
+                if (DateTime.Now.DayOfWeek == mw.Weekday)
+                {
+                    var currentDay = DateTime.Now.Date.ToString("yyyy-MM-dd");
+                    var start = DateTime.Parse($"{currentDay} {mw.StartTime}");
+                    var ts = TimeSpan.Parse(mw.Duration);
+                    var end = start.Add(ts);
+
+                    if (DateTime.Now > start && DateTime.Now < end)
+                    {
+                        Console.WriteLine("In Maintenance Window!");
+
+                        foreach (var td in _config.TempDirs)
+                        {
+                            if (td.ConcurrentPlots != 0)
+                                td.ConcurrentPlots = 0;
+                        }
+                    }
+                }
             }
         }
 
