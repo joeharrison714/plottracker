@@ -17,6 +17,8 @@ namespace PlotTracker.Core.Configuration
         public bool FinalDirMostFirst { get; set; }
 
         public List<MaintenanceWindowConfigEntry> MaintenanceWindows{ get; set; }
+
+        public int CopyPhaseIgnoreCount{ get; set; }
     }
 
     public class FinalDirConfig

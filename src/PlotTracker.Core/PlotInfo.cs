@@ -17,6 +17,8 @@ namespace PlotTracker.Core
 
     public class PlotInfo
     {
+        public const string CopyingStatusText = "Copying";
+
         public PlotInfo()
         {
             Phases = new List<PhaseInfo>();
@@ -54,7 +56,7 @@ namespace PlotTracker.Core
 
             if (!string.IsNullOrWhiteSpace(FinalFileSize))
             {
-                cps.CurrentPhase = "Copying";
+                cps.CurrentPhase = CopyingStatusText;
                 cps.StartTime = currentPhase.EndDate;
                 cps.PhaseNumber = null;
             }

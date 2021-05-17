@@ -44,8 +44,6 @@ namespace PlotTracker.Core
 
                 WriteHistorySummary(historicalData);
 
-                CheckMaintenanceWindow();
-
                 bool tookAction = CheckShouldStart(allPlotInfos);
                 if (tookAction)
                 {
@@ -57,9 +55,9 @@ namespace PlotTracker.Core
             }
         }
 
-        private void CheckMaintenanceWindow()
+        private bool IsInMaintenanceWindow()
         {
-            if (_config.MaintenanceWindows == null) return;
+            if (_config.MaintenanceWindows == null) return false;
 
             foreach (var mw in _config.MaintenanceWindows)
             {
@@ -74,14 +72,12 @@ namespace PlotTracker.Core
                     {
                         Console.WriteLine("In Maintenance Window!");
 
-                        foreach (var td in _config.TempDirs)
-                        {
-                            if (td.ConcurrentPlots != 0)
-                                td.ConcurrentPlots = 0;
-                        }
+                        return true;
                     }
                 }
             }
+
+            return false;
         }
 
         public void RunCsvExport()
@@ -140,8 +136,21 @@ namespace PlotTracker.Core
 
             bool tookAction = false;
 
-            string finalPath = GetFinalDir();
+            string finalPath = GetFinalDir(runningPlots);
             Console.WriteLine($"Next final dir to be used: {finalPath}");
+
+            int toRemove = _config.CopyPhaseIgnoreCount;
+            for (int i = runningPlots.Count - 1; i >= 0; i--)
+            {
+                if (toRemove == 0) break;
+                var cp = runningPlots[i].GetCurrentPlotStatus().CurrentPhase;
+                if (cp == PlotInfo.CopyingStatusText)
+                {
+                    Console.WriteLine("Ignoring copying phase for concurrent plot eval");
+                    runningPlots.RemoveAt(i);
+                    toRemove--;
+                }
+            }
 
             var tempDirs = GetRunningPlotsByTempDir(runningPlots);
 
@@ -183,8 +192,8 @@ namespace PlotTracker.Core
                         }
                     }
 
-                    
 
+                    if (IsInMaintenanceWindow()) return false;
 
 
                     if (shouldStart)
@@ -262,15 +271,17 @@ namespace PlotTracker.Core
         }
 
         const long NeededSpace = 108905839000;
-        private string GetFinalDir()
+        private string GetFinalDir(List<PlotInfo> runningPlots)
         {
             Dictionary<string, long> useablePaths = new Dictionary<string, long>();
 
             foreach (var fd in _config.FinalDirs)
             {
+                var neededSpace = (runningPlots.Count + 1) * NeededSpace;
+
                 DriveInfo di = new DriveInfo(Path.GetPathRoot(fd.Path));
                 //Console.WriteLine($"{di.RootDirectory} - {di.AvailableFreeSpace}");
-                if (di.AvailableFreeSpace > NeededSpace)
+                if (di.AvailableFreeSpace > neededSpace)
                 {
                     useablePaths.Add(fd.Path, di.AvailableFreeSpace);
                 }
@@ -334,8 +345,15 @@ namespace PlotTracker.Core
 
             foreach (var del in toDelete)
             {
-                Console.WriteLine($"Deleting {del}");
-                File.Delete(del);
+                try
+                {
+                    Console.WriteLine($"Deleting {del}");
+                    File.Delete(del);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Unable to delete: " + ex.Message);
+                }
             }
 
             return allPlotInfos;

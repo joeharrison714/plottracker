@@ -1,1 +1,3 @@
 # plottracker
+
+`set-executionpolicy unrestricted`
